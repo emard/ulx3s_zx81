@@ -100,26 +100,6 @@ module zx81 (
      .ps2_key(ps2_key)
   );
 
-  reg R_hsync, R_vsync;
-  reg [10:0] R_csync_cnt;
-  always @(posedge clkdvi)
-  begin
-    if(csync | vde)
-    begin
-      R_csync_cnt <= 0;
-      R_hsync <= 0;
-      R_vsync <= 0;
-    end
-    else
-    begin
-      R_hsync <= 1;
-      if(R_csync_cnt[10])
-        R_vsync <= 1;
-      else
-        R_csync_cnt <= R_csync_cnt+1;
-    end
-  end
-  
   // Convert VGA to DVI
   HDMI_out vga2dvid
   (
@@ -139,6 +119,25 @@ module zx81 (
     R_clk_pixel <= {clk_sys,R_clk_pixel[1]}; 
   wire clk_pixel_ena = R_clk_pixel == 2'b10 ? 1 : 0;
 
+  reg R_hsync, R_vsync;
+  reg [10:0] R_csync_cnt;
+  always @(posedge clkdvi)
+  begin
+    if(csync)
+    begin
+      R_csync_cnt <= 0;
+      R_hsync <= 0;
+      R_vsync <= 0;
+    end
+    else
+    begin
+      R_hsync <= 1;
+      if(R_csync_cnt[10])
+        R_vsync <= 1;
+      else
+        R_csync_cnt <= R_csync_cnt+1;
+    end
+  end
 
   wire [15:0] color = cvideo ? 16'hFFFF : 16'h0000;
   lcd_video
