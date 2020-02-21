@@ -22,6 +22,12 @@ module zx81 (
     output wire[3:0]   blue,
     output wire[3:0]   gpdi_dp,
 
+    output wire oled_csn,
+    output wire oled_clk,
+    output wire oled_mosi,
+    output wire oled_dc,
+    output wire oled_resn,
+
     output wire[13:0]  gp,
     output wire[13:0]  gn
   );
@@ -62,12 +68,15 @@ module zx81 (
 
   // Video timing
   wire vde;
+  wire csync, cvideo;
   // The ZX80/ZX81 core
   fpga_zx81 the_core (
     .clk_sys(clk_sys),
     .reset_n(poweron_reset[7] & btn[0]),
     .ear(ear),
     .ps2_key(ps2_key),
+    .csync_o(csync),
+    .cvideo_o(cvideo),
     .video(video),
     .hsync(hsync),
     .vsync(vsync),
@@ -90,18 +99,69 @@ module zx81 (
      .ps2_data(usb_fpga_bd_dn),
      .ps2_key(ps2_key)
   );
-
+  
   // Convert VGA to DVI
-  HDMI_out vga2dvid (
+  HDMI_out vga2dvid
+  (
     .pixclk(clk_25mhz),
     .pixclk_x5(clkdvi),
     .red({8{video[0]}}),
     .green({8{video[0]}}),
     .blue({8{video[0]}}),
-    .hSync(hsync),
-    .vSync(vsync),
+    .hSync(hsync & ~vde),
+    .vSync(vsync & ~vde),
     .vde(vde),
     .gpdi_dp(gpdi_dp)
   );
+
+  reg [1:0] R_clk_pixel;
+  always @(posedge clkdvi)
+    R_clk_pixel <= {clk_sys,R_clk_pixel[1]}; 
+  wire clk_pixel_ena = R_clk_pixel == 2'b10 ? 1 : 0;
+
+  reg R_hsync, R_vsync;
+  reg [10:0] R_csync_cnt;
+  always @(posedge clkdvi)
+  begin
+    if(csync == 0)
+    begin
+      R_hsync <= 1;
+      if(R_csync_cnt[10])
+        R_vsync <= 1;
+      else
+        R_csync_cnt <= R_csync_cnt+1;
+    end
+    else
+    begin
+      R_csync_cnt <= 0;
+      R_hsync <= 0;
+      R_vsync <= 0;
+    end
+  end
+
+  wire [15:0] color = cvideo ? 16'hFFFF : 16'h0000;
+  lcd_video
+  #(
+    .c_clk_mhz(125),
+    .c_vga_sync(1),
+    .c_x_size(240),
+    .c_y_size(240),
+    .c_color_bits(16)
+  )
+  lcd_video_instance
+  (
+    .clk(clkdvi), // 125 MHz
+    .reset(~btn[0]),
+    .clk_pixel_ena(clk_pixel_ena),
+    .blank(~vde),
+    .hsync(R_hsync),
+    .vsync(R_vsync),
+    .color(color),
+    .spi_resn(oled_resn),
+    .spi_clk(oled_clk),
+    .spi_dc(oled_dc),
+    .spi_mosi(oled_mosi)
+  );
+  assign oled_csn = 1;
 
 endmodule

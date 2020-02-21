@@ -6,6 +6,7 @@ module fpga_zx81 (
     input  wire reset_n,
     input  wire ear,
     input  wire [10:0] ps2_key,
+    output wire csync_o, cvideo_o,
     output wire video,
     output reg  hsync,
     output reg  vsync,
@@ -278,6 +279,9 @@ module fpga_zx81 (
      .vs_out(vsync),
      .de_out(vde),
      .v_out(video)
-);  
+   );
+   assign cvideo_o = video_out;
+   assign csync_o = csync;
+  
 endmodule
 
